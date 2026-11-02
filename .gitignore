@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+scripts/output/mirage/*/*/
+!scripts/output/mirage/_cache/
+!scripts/output/mirage/_cache/**
