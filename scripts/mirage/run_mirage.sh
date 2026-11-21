@@ -38,7 +38,7 @@ case "$DATASET" in
     GRAPH_WEIGHT="${GRAPH_WEIGHT:-0.1}"
     RECOMMENDATION_WEIGHT="${RECOMMENDATION_WEIGHT:-0.5}"
     HIDDEN_SIZE="${HIDDEN_SIZE:-128}"
-    GRAPH_DISTANCE_MODE="${GRAPH_DISTANCE_MODE:-logsumexp}"
+    GRAPH_DISTANCE_MODE="${GRAPH_DISTANCE_MODE:-softmin}"
     ;;
   *)
     echo "Unsupported dataset: $DATASET" >&2
@@ -97,8 +97,6 @@ exec "$PYTHON_BIN" -m mirage.train \
   --decay-gamma 0.1 \
   --eval-interval "${EVAL_INTERVAL:-20}" \
   --patience "${PATIENCE:-5}" \
-  --forbidden-source "${FORBIDDEN_SOURCE:-train}" \
-  ${MASK_SEEN_ITEMS:+--mask-seen-items} \
   --metric-ks 5,10,20 \
   --early-stopping-metric NDCG@20 \
   "${@:2}"

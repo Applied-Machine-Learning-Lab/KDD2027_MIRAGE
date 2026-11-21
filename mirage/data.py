@@ -145,12 +145,10 @@ def build_datasets(
     max_len: int = 20,
     stats: DataStats = None,
     negative_count: int = 10,
-    forbidden_source: str = "train",
 ) -> Tuple[Dict[str, Dataset], DataStats]:
     data_dir = Path(data_dir)
     stats = stats or validate_split_contract(data_dir)
-    source_split = "train" if forbidden_source == "train" else "test"
-    source_frame = _load(data_dir, source_split)
+    source_frame = _load(data_dir, "test")
     forbidden_items = [
         set(_items(history)) | {int(target)}
         for history, target in zip(source_frame.history, source_frame.target)

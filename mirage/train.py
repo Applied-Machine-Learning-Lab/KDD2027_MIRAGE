@@ -80,30 +80,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-graph-time-mod", action="store_true", default=False)
     parser.add_argument(
         "--graph-distance-mode", type=str, default="hardmin",
-        choices=("hardmin", "softmin", "logsumexp"),
-    )
-    parser.add_argument(
-        "--history-loss-norm", type=str, default="selected",
-        choices=("selected", "global"),
-        help="Normalization for Eq. 9 history loss: selected (active tokens) or global (legacy)",
-    )
-    parser.add_argument(
-        "--forbidden-source", type=str, default="train",
-        choices=("train", "test"),
-        help="Split used for forbidden negative sampling: train (default, leak-free) or test",
-    )
-    parser.add_argument(
-        "--mask-seen-items",
-        dest="mask_seen_items",
-        action="store_true",
-        default=False,
-        help="Mask user history items from ranking evaluation",
-    )
-    parser.add_argument(
-        "--unmasked",
-        dest="mask_seen_items",
-        action="store_false",
-        help="Do not mask user history items during evaluation (paper Table 2 setting, default)",
+        choices=("hardmin", "softmin"),
     )
     parser.add_argument("--detach-flow-state", action="store_true", default=False)
     parser.add_argument("--detach-items", action="store_true", default=False)
@@ -193,7 +170,6 @@ def run(args: argparse.Namespace):
         negative_count=(
             args.negative_count if args.loss_type == "sampled_softmax" else 0
         ),
-        forbidden_source=args.forbidden_source,
     )
     metric_ks = parse_int_tuple(args.metric_ks)
     decoder_dims = parse_int_tuple(args.decoder_dims)
@@ -232,7 +208,6 @@ def run(args: argparse.Namespace):
         graph_anchor_mode=args.graph_anchor_mode,
         graph_time_mod=not args.no_graph_time_mod,
         graph_distance_mode=args.graph_distance_mode,
-        history_loss_norm=args.history_loss_norm,
         detach_flow_state=args.detach_flow_state,
         detach_items=args.detach_items,
         endpoint_only_reg=args.endpoint_only_reg,
@@ -251,8 +226,6 @@ def run(args: argparse.Namespace):
         log_interval=args.log_interval,
         max_train_batches=args.max_train_batches,
         max_eval_batches=args.max_eval_batches,
-        mask_seen_items=args.mask_seen_items,
-        forbidden_source=args.forbidden_source,
     )
     run_name = args.run_name or datetime.now().strftime("%Y%m%d-%H%M%S")
     run_dir = Path(args.output_root) / args.dataset / run_name

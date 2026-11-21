@@ -50,8 +50,7 @@ class ModelConfig:
     use_history_anchor: bool = False
     graph_anchor_mode: str = "target"  # "target" or "user"
     graph_time_mod: bool = True  # parabolic time weight 4t(1-t) when True; constant 1.0 when False
-    graph_distance_mode: str = "hardmin"  # "hardmin", "softmin", or "logsumexp"
-    history_loss_norm: str = "selected"  # "selected" (Eq. 9 active tokens) or "global" (legacy)
+    graph_distance_mode: str = "hardmin"  # "hardmin" or "softmin"
     detach_flow_state: bool = False  # stop-gradient on continuous flow state x_t
     detach_items: bool = False  # stop-gradient on item table embeddings e
     endpoint_only_reg: bool = False  # regularize target embedding directly at t=1 with constant weight
@@ -107,8 +106,6 @@ class TrainConfig:
     log_interval: int = 100
     max_train_batches: Optional[int] = None
     max_eval_batches: Optional[int] = None
-    mask_seen_items: bool = False
-    forbidden_source: str = "train"
 
     def __post_init__(self) -> None:
         if self.epochs <= 0 or self.learning_rate <= 0 or self.weight_decay < 0:

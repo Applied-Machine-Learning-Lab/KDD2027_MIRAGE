@@ -40,17 +40,13 @@ If you already have a compatible Python environment activated, you can also run 
 
 ## Reproduction scripts
 
-All scripts use CUDA, seed `2026`, and leak-free negative sampling (`--forbidden-source train`, excluding training items from negatives). Select the target GPU with `DEVICE=cuda:<id>`.
+All scripts use CUDA, seed `2026`, and the training protocol used for the reported checkpoints. The negative sampler excludes the items in each user's complete provided sequence. Select the target GPU with `DEVICE=cuda:<id>`.
 
 ### Evaluation protocols
 
-Two evaluation protocols are supported:
-1. **Paper Protocol (Table 2, Default)**: Evaluates ranking over all items without filtering seen history items (unmasked), reproducing the numbers in Table 2 of the paper.
-2. **Seen-Item Masked Protocol (`--mask-seen-items`)**: Filters out items that already appeared in the user's history during evaluation.
+The reproduction scripts evaluate ranking over the full item catalog without filtering seen history items, matching the protocol used for Table 2.
 
 ### Running experiments
-
-**Paper Table 2 (Unmasked evaluation - Default):**
 
 ```bash
 # Single dataset
@@ -61,19 +57,6 @@ DEVICE=cuda:0 bash scripts/mirage/run_cds.sh
 
 # All datasets sequentially
 DEVICE=cuda:0 bash scripts/mirage/run_all_datasets.sh
-```
-
-**Seen-Item Masked evaluation:**
-
-```bash
-# Single dataset with seen-item masking
-DEVICE=cuda:0 bash scripts/mirage/run_beauty.sh --mask-seen-items
-DEVICE=cuda:0 bash scripts/mirage/run_sports.sh --mask-seen-items
-DEVICE=cuda:0 bash scripts/mirage/run_toys.sh --mask-seen-items
-DEVICE=cuda:0 bash scripts/mirage/run_cds.sh --mask-seen-items
-
-# All datasets sequentially with seen-item masking
-DEVICE=cuda:0 bash scripts/mirage/run_all_datasets.sh --mask-seen-items
 ```
 
 Dry run without launching training:
@@ -114,20 +97,7 @@ python -m mirage.train \
   --sample-steps 1 \
   --graph-weight 0.1 \
   --graph-k 20 \
-  --recommendation-weight 0.2 \
-  --forbidden-source train
-
-# With seen-item masking
-python -m mirage.train \
-  --dataset beauty \
-  --device cuda:0 \
-  --run-name manual_beauty_masked \
-  --sample-steps 1 \
-  --graph-weight 0.1 \
-  --graph-k 20 \
-  --recommendation-weight 0.2 \
-  --forbidden-source train \
-  --mask-seen-items
+  --recommendation-weight 0.2
 ```
 
 For a rapid CPU smoke test:

@@ -34,7 +34,7 @@ class MIRAGEModel(nn.Module):
         super().__init__()
         self.config = config
         self.item_embedding = nn.Embedding(
-            config.item_count + 1, config.hidden_size, padding_idx=0
+            config.item_count + 1, config.hidden_size
         )
         self.embedding_dropout = nn.Dropout(config.embedding_dropout)
         self.embedding_norm = LayerNorm(config.hidden_size)
@@ -118,12 +118,7 @@ class MIRAGEModel(nn.Module):
             )
             coordinates = candidates[indices]
             selected[coordinates[:, 0], coordinates[:, 1]] = True
-        if getattr(self.config, "history_loss_norm", "selected") == "global":
-            return ((output - target).square() * selected).mean()
-        # Per-user normalization over active items per Eq. (9)
-        user_selected = selected.sum(dim=-1).clamp(min=1)
-        per_user_loss = ((output - target).square() * selected).sum(dim=-1) / user_selected
-        return per_user_loss.mean()
+        return ((output - target).square() * selected).mean()
 
     def recommendation_loss(
         self,
@@ -188,10 +183,10 @@ class MIRAGEModel(nn.Module):
                 anchors[:, 2] = sequence[:, -2]
                 anchors = anchors.clamp(0, knn.shape[0] - 1)
                 nb = knn[anchors, :K].view(B, -1)  # (B, 3*K)
-                invalid = (anchors == 0).unsqueeze(-1).expand(-1, -1, K).reshape(B, -1) | (nb == 0)
+                invalid = (anchors == 0).unsqueeze(-1).expand(-1, -1, K).reshape(B, -1)
             else:
                 nb = knn[target.clamp(0, knn.shape[0] - 1), :K]  # (B, K)
-                invalid = (nb == 0)
+                invalid = torch.zeros_like(nb, dtype=torch.bool)
 
             nb_emb = self.item_embedding(nb)
             if getattr(self.config, "detach_items", False):
@@ -211,21 +206,9 @@ class MIRAGEModel(nn.Module):
                 flow_state = flow_state.detach()
 
             dist_sq = (flow_state.unsqueeze(1) - nb_emb).square().sum(dim=-1)
-            dist_sq.masked_fill_(invalid, float('inf'))  # strictly exclude padding item 0
+            dist_sq.masked_fill_(invalid, float('inf'))
 
-            if self.config.graph_distance_mode == "logsumexp":
-                # Exact Eq. (11) LogSumExp soft minimum with 1/K normalization
-                tau = 0.1
-                neg_dist = -dist_sq / tau
-                neg_dist_safe = torch.where(invalid, torch.full_like(neg_dist, -1e9), neg_dist)
-                valid_counts = (~invalid).sum(dim=-1).clamp(min=1).float()
-                agg_dist_sq = -tau * (torch.logsumexp(neg_dist_safe, dim=-1) - torch.log(valid_counts))
-                agg_dist_sq = torch.where(
-                    torch.isinf(agg_dist_sq) | (agg_dist_sq > 1e8),
-                    torch.zeros_like(agg_dist_sq),
-                    agg_dist_sq,
-                )
-            elif self.config.graph_distance_mode == "softmin":
+            if self.config.graph_distance_mode == "softmin":
                 # Temperature-scaled softmin: weighted centroid of K neighbors
                 tau = 0.1  # temperature for softmin
                 neg_dist = -dist_sq / tau

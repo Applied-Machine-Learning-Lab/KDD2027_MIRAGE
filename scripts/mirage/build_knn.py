@@ -21,7 +21,7 @@ DATASET_PATHS = {
     "cds": "dataset/cds",
 }
 DEFAULT_WINDOWS = {
-    "cds": 1,
+    "cds": 5,
     "beauty": 5,
     "sports": 5,
     "toys": 5,
@@ -54,7 +54,7 @@ def build_knn(dataset: str, K: int = 100, window: int = None):
         scores.sort(key=lambda x: -x[1])
         for rank, (j, _) in enumerate(scores[:K]):
             knn[i, rank] = j
-        # remaining stay 0 (padding) — model masks them as inf
+        # Remaining slots stay at item 0, matching the paper checkpoints.
 
     out_dir = OUTPUT_BASE / dataset
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -77,7 +77,7 @@ def main():
     parser.add_argument("--dataset", choices=list(DATASET_PATHS), default="beauty")
     parser.add_argument("--all", action="store_true")
     parser.add_argument("--K", type=int, default=100)
-    parser.add_argument("--window", type=int, default=None, help="Context window (default: 1 for CDs, 5 for other datasets)")
+    parser.add_argument("--window", type=int, default=None, help="Context window (default: 5)")
     args = parser.parse_args()
 
     datasets = list(DATASET_PATHS) if args.all else [args.dataset]

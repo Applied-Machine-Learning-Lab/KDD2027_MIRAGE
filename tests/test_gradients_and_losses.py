@@ -1,6 +1,6 @@
 """
 Comprehensive gradient flow and loss stability audit for MIRAGE.
-Tests all loss modes, gradient backprop, stop-gradients, padding isolation, and numerical stability.
+Tests loss modes, gradient backprop, stop-gradients, learned item 0, and numerical stability.
 """
 
 import sys
@@ -59,69 +59,65 @@ class TestGradientsAndLosses(unittest.TestCase):
         return sequence, target, negative
 
     def test_loss_modes_forward_backward(self):
-        """Test forward and backward passes across all distance modes and history loss norms."""
-        modes = ["softmin", "logsumexp", "hardmin"]
-        norms = ["selected", "global"]
+        """Test forward and backward passes across all distance and time modes."""
+        modes = ["softmin", "hardmin"]
         time_mods = [True, False]
 
         sequence, target, negative = self._generate_batch()
 
         for mode in modes:
-            for norm in norms:
-                for tmod in time_mods:
-                    with self.subTest(mode=mode, norm=norm, time_mod=tmod):
-                        model = self._create_model(
-                            graph_distance_mode=mode,
-                            history_loss_norm=norm,
-                            graph_time_mod=tmod,
+            for tmod in time_mods:
+                with self.subTest(mode=mode, time_mod=tmod):
+                    model = self._create_model(
+                        graph_distance_mode=mode, graph_time_mod=tmod
+                    )
+                    model.train()
+                    model.zero_grad()
+
+                    losses = model.compute_loss(sequence, target, negative)
+                    total = losses["loss"]
+
+                    self.assertTrue(
+                        torch.isfinite(total), f"Total loss not finite for {mode}"
+                    )
+                    self.assertGreater(total.item(), 0.0)
+                    for name, val in losses.items():
+                        self.assertTrue(
+                            torch.isfinite(val), f"Loss {name} not finite for {mode}"
                         )
-                        model.train()
-                        model.zero_grad()
+                        self.assertGreaterEqual(val.item(), 0.0)
 
-                        losses = model.compute_loss(sequence, target, negative)
-                        total = losses["loss"]
+                    total.backward()
 
-                        # 1. Assert losses are finite and positive
-                        self.assertTrue(torch.isfinite(total), f"Total loss not finite for {mode}/{norm}")
-                        self.assertGreater(total.item(), 0.0)
-                        for name, val in losses.items():
-                            self.assertTrue(torch.isfinite(val), f"Loss {name} not finite for {mode}/{norm}")
-                            self.assertGreaterEqual(val.item(), 0.0)
+                    for p_name, param in model.named_parameters():
+                        if param.grad is not None:
+                            self.assertFalse(
+                                torch.isnan(param.grad).any(),
+                                f"NaN gradient in {p_name} for {mode}",
+                            )
+                            self.assertFalse(
+                                torch.isinf(param.grad).any(),
+                                f"Inf gradient in {p_name} for {mode}",
+                            )
 
-                        # 2. Backward pass
-                        total.backward()
-
-                        # 3. Assert no NaN or Inf in any gradient
-                        for p_name, param in model.named_parameters():
-                            if param.grad is not None:
-                                self.assertFalse(
-                                    torch.isnan(param.grad).any(),
-                                    f"NaN gradient in {p_name} for {mode}/{norm}",
-                                )
-                                self.assertFalse(
-                                    torch.isinf(param.grad).any(),
-                                    f"Inf gradient in {p_name} for {mode}/{norm}",
-                                )
-
-                        # 4. Item 0 padding isolation: item_embedding.weight.grad[0] must be exactly 0
-                        pad_grad = model.item_embedding.weight.grad[0]
-                        self.assertEqual(
-                            pad_grad.abs().sum().item(),
-                            0.0,
-                            f"Item 0 padding embedding received gradient for {mode}/{norm}!",
-                        )
+                    pad_grad = model.item_embedding.weight.grad[0]
+                    self.assertGreater(
+                        pad_grad.abs().sum().item(),
+                        0.0,
+                        f"Item 0 did not receive a gradient for {mode}",
+                    )
 
     def test_user_anchor_mode(self):
         """Test graph_anchor_mode='user' forward and backward."""
         sequence, target, negative = self._generate_batch()
-        model = self._create_model(graph_anchor_mode="user", graph_distance_mode="logsumexp")
+        model = self._create_model(graph_anchor_mode="user", graph_distance_mode="softmin")
         model.train()
         losses = model.compute_loss(sequence, target, negative)
         total = losses["loss"]
         self.assertTrue(torch.isfinite(total))
         total.backward()
         self.assertFalse(torch.isnan(model.item_embedding.weight.grad).any())
-        self.assertEqual(model.item_embedding.weight.grad[0].abs().sum().item(), 0.0)
+        self.assertGreater(model.item_embedding.weight.grad[0].abs().sum().item(), 0.0)
 
     def test_sampled_softmax_loss(self):
         """Test sampled_softmax recommendation loss mode."""
@@ -176,16 +172,15 @@ class TestGradientsAndLosses(unittest.TestCase):
         self.assertGreater(losses["graph"].item(), 0.0)
         total.backward()
         self.assertFalse(torch.isnan(model.item_embedding.weight.grad).any())
-        self.assertEqual(model.item_embedding.weight.grad[0].abs().sum().item(), 0.0)
+        self.assertGreater(model.item_embedding.weight.grad[0].abs().sum().item(), 0.0)
 
-    def test_history_loss_per_user_normalization(self):
-        """Test that history reconstruction loss normalizes per user per Eq. (9)."""
+    def test_history_loss_global_normalization(self):
+        """Test the global full-catalog normalization used by the paper runs."""
         model = self._create_model(mask_ratio=0.0)
         # Create synthetic output and target with 2 users
         # User 1 has 1 selected token with error 1.0 (sq_err = 1.0 -> per_user = 1.0)
         # User 2 has 2 selected tokens each with error 2.0 (sq_err = 4.0 * 2 = 8.0 -> per_user = 4.0)
-        # Expected Eq. (9) mean: (1.0 + 4.0) / 2 = 2.5
-        # (Global batch sum would be (1.0 + 8.0) / 3 = 3.0)
+        # The selected squared error is 9 and the global tensor has 202 entries.
         out = torch.zeros(2, self.num_items + 1)
         tgt = torch.zeros(2, self.num_items + 1)
         # user 0: item 1 positive
@@ -198,17 +193,7 @@ class TestGradientsAndLosses(unittest.TestCase):
         out[1, 3] = 3.0  # error = 2.0, sq = 4.0
 
         loss = model.balanced_reconstruction_loss(out, tgt)
-        self.assertAlmostEqual(loss.item(), 2.5, places=5)
-
-    def test_logsumexp_normalization(self):
-        """Test that Eq. (11) logsumexp mode preserves distance scale under identical distances."""
-        model = self._create_model(graph_distance_mode="logsumexp")
-        # Run forward pass and verify finite loss
-        sequence, target, negative = self._generate_batch()
-        losses = model.compute_loss(sequence, target, negative)
-        self.assertTrue(torch.isfinite(losses["graph"]))
-        self.assertGreaterEqual(losses["graph"].item(), 0.0)
-
+        self.assertAlmostEqual(loss.item(), 9.0 / (2 * (self.num_items + 1)), places=7)
 
 if __name__ == "__main__":
     unittest.main()

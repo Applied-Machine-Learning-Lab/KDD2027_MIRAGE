@@ -52,8 +52,6 @@ class MIRAGETrainer:
         self.model.eval()
         metrics = RankingMetricAccumulator(self.config.metric_ks)
         generator = torch.Generator(device=self.device).manual_seed(self.eval_seed)
-        user_offset = 0
-        has_hist = hasattr(loader.dataset, "histories")
         for batch_index, (sequence, target) in enumerate(loader):
             if (
                 self.config.max_eval_batches is not None
@@ -63,21 +61,7 @@ class MIRAGETrainer:
             sequence = sequence.to(self.device, non_blocking=True)
             target = target.to(self.device, non_blocking=True)
             scores = self.model.score(sequence, generator)
-            if getattr(self.config, "mask_seen_items", True):
-                B = sequence.shape[0]
-                if has_hist:
-                    for b in range(B):
-                        u_idx = user_offset + b
-                        if u_idx < len(loader.dataset.histories):
-                            h_items = loader.dataset.histories[u_idx]
-                            if h_items:
-                                t_hist = torch.tensor(h_items, device=self.device, dtype=torch.long)
-                                scores[b, t_hist] = -float("inf")
-                else:
-                    scores.scatter_(1, sequence, -float("inf"))
-                scores[:, 0] = -float("inf")
             metrics.update(scores, target)
-            user_offset += sequence.shape[0]
         return metrics.compute()
 
     def _train_epoch(self, optimizer, epoch: int):
