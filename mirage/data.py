@@ -148,7 +148,7 @@ def build_datasets(
 ) -> Tuple[Dict[str, Dataset], DataStats]:
     data_dir = Path(data_dir)
     stats = stats or validate_split_contract(data_dir)
-    source_frame = _load(data_dir, "test")
+    source_frame = _load(data_dir, "train")
     forbidden_items = [
         set(_items(history)) | {int(target)}
         for history, target in zip(source_frame.history, source_frame.target)

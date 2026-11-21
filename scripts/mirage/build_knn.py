@@ -54,7 +54,7 @@ def build_knn(dataset: str, K: int = 100, window: int = None):
         scores.sort(key=lambda x: -x[1])
         for rank, (j, _) in enumerate(scores[:K]):
             knn[i, rank] = j
-        # Remaining slots stay at item 0, matching the paper checkpoints.
+        # Missing neighbors remain 0 and are ignored by the topology loss.
 
     out_dir = OUTPUT_BASE / dataset
     out_dir.mkdir(parents=True, exist_ok=True)

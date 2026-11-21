@@ -40,11 +40,7 @@ If you already have a compatible Python environment activated, you can also run 
 
 ## Reproduction scripts
 
-All scripts use CUDA, seed `2026`, and the training protocol used for the reported checkpoints. The negative sampler excludes the items in each user's complete provided sequence. Select the target GPU with `DEVICE=cuda:<id>`.
-
-### Evaluation protocols
-
-The reproduction scripts evaluate ranking over the full item catalog without filtering seen history items, matching the protocol used for Table 2.
+All scripts use CUDA and seed `2026`. Training negatives are sampled outside each user's training interactions. Select the target GPU with `DEVICE=cuda:<id>`.
 
 ### Running experiments
 
@@ -89,7 +85,7 @@ MIRAGE dynamically loads the first `K` columns from `cooccur_knn_100.pt`, so the
 You can directly invoke the training module via Python:
 
 ```bash
-# Paper Table 2 protocol (Unmasked)
+# Beauty
 python -m mirage.train \
   --dataset beauty \
   --device cuda:0 \
@@ -116,7 +112,7 @@ python -m mirage.train \
 Run the unit test suite to verify gradient flows, loss stability, and model components:
 
 ```bash
-python -m unittest tests/test_gradients_and_losses.py
+python -m unittest discover -s tests -v
 ```
 
 ## Citation

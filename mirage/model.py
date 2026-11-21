@@ -183,10 +183,13 @@ class MIRAGEModel(nn.Module):
                 anchors[:, 2] = sequence[:, -2]
                 anchors = anchors.clamp(0, knn.shape[0] - 1)
                 nb = knn[anchors, :K].view(B, -1)  # (B, 3*K)
-                invalid = (anchors == 0).unsqueeze(-1).expand(-1, -1, K).reshape(B, -1)
+                invalid = (
+                    (anchors == 0).unsqueeze(-1).expand(-1, -1, K).reshape(B, -1)
+                )
+                invalid = invalid | nb.eq(0)
             else:
                 nb = knn[target.clamp(0, knn.shape[0] - 1), :K]  # (B, K)
-                invalid = torch.zeros_like(nb, dtype=torch.bool)
+                invalid = nb.eq(0)
 
             nb_emb = self.item_embedding(nb)
             if getattr(self.config, "detach_items", False):
