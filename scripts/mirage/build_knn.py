@@ -9,7 +9,7 @@ The KNN graph is saved to scripts/output/mirage/_cache/<dataset>/cooccur_knn_<K>
 """
 import argparse, sys, torch, numpy as np, pandas as pd
 from pathlib import Path
-from collections import Counter
+from collections import Counter, defaultdict
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from mirage.data import validate_split_contract
@@ -21,7 +21,7 @@ DATASET_PATHS = {
     "cds": "dataset/cds",
 }
 DEFAULT_WINDOWS = {
-    "cds": 5,
+    "cds": 1,
     "beauty": 5,
     "sports": 5,
     "toys": 5,
@@ -37,7 +37,7 @@ def build_knn(dataset: str, K: int = 100, window: int = None):
     print(f"[{dataset}] item_count={stats.item_count}, V={V}, K={K}, window={window} (per Appendix B.3)")
 
     train_df = pd.read_parquet(data_dir / "train.parquet", columns=["history", "target"])
-    cooccur = Counter()
+    cooccur = defaultdict(Counter)
 
     for _, row in train_df.iterrows():
         items = [int(x) for x in row["history"]] + [int(row["target"])]
@@ -45,13 +45,13 @@ def build_knn(dataset: str, K: int = 100, window: int = None):
         for i in range(len(items)):
             for j in range(max(0, i - window), min(len(items), i + window + 1)):
                 if i != j:
-                    cooccur[(items[i], items[j])] += 1
+                    cooccur[items[i]][items[j]] += 1
 
     knn = torch.zeros(V, K, dtype=torch.long)
     for i in range(1, V):
         # Only include items with actual co-occurrence — prevent fake neighbors
-        scores = [(j, cooccur[(i, j)]) for j in range(1, V) if (i, j) in cooccur]
-        scores.sort(key=lambda x: -x[1])
+        scores = list(cooccur[i].items())
+        scores.sort(key=lambda x: (-x[1], x[0]))
         for rank, (j, _) in enumerate(scores[:K]):
             knn[i, rank] = j
         # Remaining slots stay at item 0, matching the paper checkpoints.
@@ -77,7 +77,7 @@ def main():
     parser.add_argument("--dataset", choices=list(DATASET_PATHS), default="beauty")
     parser.add_argument("--all", action="store_true")
     parser.add_argument("--K", type=int, default=100)
-    parser.add_argument("--window", type=int, default=None, help="Context window (default: 5)")
+    parser.add_argument("--window", type=int, default=None, help="Context window (default: 1 for CDs, 5 otherwise)")
     args = parser.parse_args()
 
     datasets = list(DATASET_PATHS) if args.all else [args.dataset]
