@@ -186,10 +186,9 @@ class MIRAGEModel(nn.Module):
                 invalid = (
                     (anchors == 0).unsqueeze(-1).expand(-1, -1, K).reshape(B, -1)
                 )
-                invalid = invalid | nb.eq(0)
             else:
                 nb = knn[target.clamp(0, knn.shape[0] - 1), :K]  # (B, K)
-                invalid = nb.eq(0)
+                invalid = torch.zeros_like(nb, dtype=torch.bool)
 
             nb_emb = self.item_embedding(nb)
             if getattr(self.config, "detach_items", False):

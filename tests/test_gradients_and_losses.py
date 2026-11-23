@@ -174,8 +174,8 @@ class TestGradientsAndLosses(unittest.TestCase):
         self.assertFalse(torch.isnan(model.item_embedding.weight.grad).any())
         self.assertGreater(model.item_embedding.weight.grad[0].abs().sum().item(), 0.0)
 
-    def test_zero_neighbors_are_ignored_by_graph_loss(self):
-        """Reserved zero slots must not contribute to topology loss or gradients."""
+    def test_zero_neighbors_participate_in_graph_loss(self):
+        """Empty graph slots retain the learned item-0 behavior used by paper runs."""
         sequence, _, negative = self._generate_batch()
         target = torch.ones(self.batch_size, dtype=torch.long)
 
@@ -187,12 +187,12 @@ class TestGradientsAndLosses(unittest.TestCase):
                 model.set_graph(graph)
 
                 losses = model.compute_loss(sequence, target, negative)
-                self.assertEqual(losses["graph"].item(), 0.0)
+                self.assertGreater(losses["graph"].item(), 0.0)
                 losses["graph"].backward()
 
                 gradient = model.item_embedding.weight.grad
-                if gradient is not None:
-                    self.assertTrue(torch.equal(gradient, torch.zeros_like(gradient)))
+                self.assertIsNotNone(gradient)
+                self.assertGreater(gradient[0].abs().sum().item(), 0.0)
 
     def test_history_loss_global_normalization(self):
         """Test the global full-catalog normalization used by the paper runs."""

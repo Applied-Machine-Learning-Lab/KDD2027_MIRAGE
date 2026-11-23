@@ -10,7 +10,7 @@ from mirage.data import build_datasets
 
 
 class TestDataSampling(unittest.TestCase):
-    def test_forbidden_items_come_only_from_training_split(self):
+    def test_forbidden_items_cover_complete_observed_sequence(self):
         with tempfile.TemporaryDirectory() as directory:
             data_dir = Path(directory)
             frames = {
@@ -27,12 +27,10 @@ class TestDataSampling(unittest.TestCase):
             for split, frame in frames.items():
                 frame.to_parquet(data_dir / f"{split}.parquet", index=False)
 
-            datasets, _ = build_datasets(data_dir, negative_count=1)
+            datasets, _ = build_datasets(data_dir, negative_count=0)
             forbidden = datasets["train"].forbidden_items[0]
 
-            self.assertEqual(forbidden, {0, 1, 2})
-            self.assertNotIn(3, forbidden)
-            self.assertNotIn(4, forbidden)
+            self.assertEqual(forbidden, {0, 1, 2, 3, 4})
 
 
 if __name__ == "__main__":
