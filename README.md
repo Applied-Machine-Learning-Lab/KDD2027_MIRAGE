@@ -39,7 +39,7 @@ If you already have a compatible Python environment activated, you can also run 
 
 ## Reproduction scripts
 
-All scripts use CUDA and seed `2026`. Training negatives are sampled outside each user's training interactions. Select the target GPU with `DEVICE=cuda:<id>`.
+All scripts use CUDA and seed `2026`. Select the target GPU with `DEVICE=cuda:<id>`.
 
 ### Running experiments
 
