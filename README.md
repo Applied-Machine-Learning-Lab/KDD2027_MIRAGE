@@ -15,7 +15,6 @@ scripts/mirage/run_all_datasets.sh   # Run Beauty, Sports, Toys, CDs sequentiall
 scripts/mirage/build_knn.py          # Rebuild co-occurrence KNN graphs if needed
 dataset/{beauty,sports,toys,cds}/    # Dataset splits (train, valid, test)
 scripts/output/mirage/_cache/*/      # Prebuilt co-occurrence KNN caches
-assets/visualizations/              # Qualitative manifold and geometric analysis figures
 tests/                              # Unit test suite
 ```
 
